@@ -1,0 +1,15 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.0.0-1580
+
+ARG GID=1000
+ARG UID=1000
+ARG SPARK_VERSION="3.3.0"
+
+# install java, python and other dependencies 
+RUN microdnf install --no-docs java-17-openjdk python3 tar shadow-utils \
+  && ln -sf python3 /usr/bin/python \
+  && ln -sf pip3 /usr/bin/pip \
+  && pip install --no-cache --upgrade pip setuptools wheel
+
+# create non root user 
+RUN groupadd --gid ${GROUPID} sparkuser \
+  && 
