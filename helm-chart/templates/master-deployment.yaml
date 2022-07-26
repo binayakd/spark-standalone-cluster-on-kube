@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: spark-master
+  name: spark-master
+  namespace: de
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ (tpl (.Files.Glob "configs/*").AsConfig . )  | sha256sum }}
+      labels:
+        app: spark-master
+    spec:
+      containers:
+        - name: spark-py
+          image: binayakd86/spark-py:v0.1
+          command: ["/opt/spark/bin/spark-class"]
+          args: ["org.apache.spark.deploy.master.Master"]
+          env:
+            - name: SPARK_MASTER_HOST
+              value: "0.0.0.0"
+            - name: SPARK_MASTER_PORT
+              value: "7077"
+            - name: SPARK_MASTER_WEBUI_PORT
+              value: "8080"
+            - name: SPARK_LOCAL_DIRS
+              value: /tmp/scratch
+            - name: SPARK_DAEMON_JAVA_OPTS
+              value: "-Dspark.deploy.recoveryMode=FILESYSTEM -Dspark.deploy.recoveryDirectory=/recovery"
+            - name: SPARK_LOCAL_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+            - name: spark-conf
+              mountPath: /opt/spark/conf
+            - mountPath: /tmp
+              name: tmp
+            - mountPath: /recovery
+              name: recovery
+      volumes:
+        - name: spark-conf
+          configMap:
+            name: spark-conf
+        - name: tmp
+          emptyDir: {}
+        - name: recovery
+          nfs:
+            server: 192.168.0.101
+            path: "/root/cluster-data/spark-master-recovery"

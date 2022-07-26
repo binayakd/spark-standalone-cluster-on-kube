@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: spark-worker
+  name: spark-worker
+  namespace: de
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spark-worker
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ (tpl (.Files.Glob "configs/*").AsConfig . )  | sha256sum }}
+      labels:
+        app: spark-worker
+    spec:
+      containers:
+        - name: spark-py
+          image: binayakd86/spark-py:v0.1
+          command: ["/opt/spark/bin/spark-class"]
+          args: ["org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+          env:
+            - name: SPARK_WORKER_PORT
+              value: "7077"
+            - name: SPARK_WORKER_WEBUI_PORT
+              value: "8080"
+            - name: SPARK_WORKER_DIR
+              value: /tmp/scratch
+            - name: SPARK_DAEMON_JAVA_OPTS
+              value: "-Dspark.deploy.recoveryMode=FILESYSTEM -Dspark.deploy.recoveryDirectory=/recovery"
+            - name: SPARK_WORKER_OPTS
+              value: "-Dspark.worker.cleanup.enabled=true"
+            - name: SPARK_LOCAL_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+            - name: spark-conf
+              mountPath: /opt/spark/conf
+            - mountPath: /tmp
+              name: tmp
+            - mountPath: /recovery
+              name: recovery
+      volumes:
+        - name: spark-conf
+          configMap:
+            name: spark-conf
+        - name: tmp
+          emptyDir: {}
+        - name: recovery
+          nfs:
+            server: 192.168.0.101
+            path: "/root/cluster-data/spark-master-recovery"
